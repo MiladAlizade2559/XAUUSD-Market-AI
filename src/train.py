@@ -22,9 +22,9 @@ from features import create_features
 
 from window import create_windows
 
-from split import split_data
+from split import split_time_series
 
-from scaler import fit_scaler, transform_data
+from scaler import MarketScaler
 
 from dataset import MarketDataset
 
@@ -58,7 +58,7 @@ print(
 
 
 df = pd.read_csv(
-    "data/XAUUSD.csv"
+    "data/XAUUSD_l_M1.csv"
 )
 
 
@@ -108,7 +108,7 @@ print(
 # =====================================
 
 
-train_data, val_data, test_data = split_data(
+train_data, val_data, test_data = split_time_series(
     windows
 )
 
@@ -135,25 +135,22 @@ print(
 # =====================================
 
 
-scaler = fit_scaler(
+scaler = MarketScaler()
+
+scaler.fit(train_data)
+
+
+train_scaled = scaler.transform(
     train_data
 )
 
 
-train_scaled = transform_data(
-    scaler,
-    train_data
-)
-
-
-val_scaled = transform_data(
-    scaler,
+val_scaled = scaler.transform(
     val_data
 )
 
 
-test_scaled = transform_data(
-    scaler,
+test_scaled = scaler.transform(
     test_data
 )
 
