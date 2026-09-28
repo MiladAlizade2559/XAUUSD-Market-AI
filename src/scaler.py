@@ -1,8 +1,8 @@
 # src/scaler.py
 
-import os
 import pickle
 import numpy as np
+
 from sklearn.preprocessing import StandardScaler
 
 
@@ -16,43 +16,84 @@ class MarketScaler:
 
 
 
-    def fit(self, data):
+    def fit(self, windows):
 
         """
-        Learn normalization parameters.
+        Fit scaler only on training windows.
 
         Input:
-            2D array:
-            (samples, features)
+
+            (samples, sequence, features)
+
+        Example:
+
+            (70000,60,4)
+
         """
 
-        self.scaler.fit(data)
+
+        samples, seq, features = windows.shape
+
+
+        reshaped = windows.reshape(
+            samples * seq,
+            features
+        )
+
+
+        self.scaler.fit(
+            reshaped
+        )
+
 
         return self
 
 
 
-    def transform(self, data):
+    def transform(self, windows):
 
         """
-        Apply learned normalization.
+        Normalize windows.
+
+        Keeps original shape.
         """
 
-        return self.scaler.transform(data)
+
+        samples, seq, features = windows.shape
+
+
+        reshaped = windows.reshape(
+            samples * seq,
+            features
+        )
+
+
+        scaled = self.scaler.transform(
+            reshaped
+        )
+
+
+        return scaled.reshape(
+            samples,
+            seq,
+            features
+        )
 
 
 
-    def fit_transform(self, data):
+    def fit_transform(self, windows):
 
-        return self.scaler.fit_transform(data)
+        self.fit(
+            windows
+        )
+
+        return self.transform(
+            windows
+        )
 
 
 
     def save(self, path):
-
-        """
-        Save trained scaler.
-        """
 
         with open(path, "wb") as f:
 
@@ -65,54 +106,10 @@ class MarketScaler:
 
     def load(self, path):
 
-        """
-        Load existing scaler.
-        """
-
         with open(path, "rb") as f:
 
-            self.scaler = pickle.load(f)
+            self.scaler = pickle.load(
+                f
+            )
 
         return self
-
-
-
-def scale_features(
-    train_data,
-    val_data=None,
-    scaler_path="market_scaler.pkl"
-):
-
-
-    scaler = MarketScaler()
-
-
-    # فقط Train یاد می‌گیرد
-
-    train_scaled = scaler.fit_transform(
-        train_data
-    )
-
-
-    if val_data is not None:
-
-        val_scaled = scaler.transform(
-            val_data
-        )
-
-    else:
-
-        val_scaled = None
-
-
-
-    scaler.save(
-        scaler_path
-    )
-
-
-
-    return (
-        train_scaled,
-        val_scaled
-    )
