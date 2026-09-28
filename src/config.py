@@ -1,105 +1,90 @@
-
-# src/config.py
-
-import os
+# config.py
 
 
 # =========================
-# Project Paths
+# Data Configuration
 # =========================
 
-PROJECT_ROOT = os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__))
-)
+# XAUUSD point size
+POINT = 0.01
 
-DATA_DIR = os.path.join(PROJECT_ROOT, "data")
-MODEL_DIR = os.path.join(PROJECT_ROOT, "models")
-REPORT_DIR = os.path.join(PROJECT_ROOT, "reports")
 
 
 # =========================
-# Data Settings
+# Feature Configuration
 # =========================
-
-# تعداد کندل‌هایی که مدل در هر ورودی می‌بیند
-SEQ_LENGTH = 60
-
-
-# تایم فریم
-TIMEFRAME = "M1"
-
-
-# =========================
-# Feature Settings
-# =========================
-
-# تعداد Featureهای ورودی
-NUM_FEATURES = 10
-
 
 FEATURE_NAMES = [
-    "open",
-    "high",
-    "low",
-    "close",
-    "volume",
-    "range",
-    "body",
-    "upper_wick",
-    "lower_wick",
-    "volatility"
+
+    "range_points",
+
+    "open_position_points",
+
+    "close_position_points",
+
+    "gap_points"
+
 ]
 
 
-# =========================
-# Model Settings
-# =========================
+NUM_FEATURES = len(
+    FEATURE_NAMES
+)
 
-# اندازه Representation بازار
-EMBEDDING_DIM = 256
-
-
-# CNN
-CNN_CHANNELS = 64
-
-
-# Transformer
-TRANSFORMER_LAYERS = 3
-TRANSFORMER_HEADS = 8
-TRANSFORMER_DROPOUT = 0.1
 
 
 # =========================
-# Training Settings
+# Window Configuration
+# =========================
+
+# Number of candles in each sequence
+SEQ_LENGTH = 60
+
+
+
+# =========================
+# Train Configuration
 # =========================
 
 BATCH_SIZE = 64
 
-EPOCHS = 50
+EPOCHS = 30
 
-LEARNING_RATE = 1e-4
+LEARNING_RATE = 0.001
 
-WEIGHT_DECAY = 1e-5
-
-
-# =========================
-# Masking Settings
-# =========================
-
-MASK_RATIO = 0.15
 
 
 # =========================
-# Files
+# Split Configuration
 # =========================
 
-BEST_MODEL_PATH = os.path.join(
-    MODEL_DIR,
-    "best_market_model.pt"
-)
+TRAIN_RATIO = 0.70
+
+VAL_RATIO = 0.15
+
+TEST_RATIO = 0.15
 
 
-REPORT_PATH = os.path.join(
-    REPORT_DIR,
-    "training_report.json"
-)
+
+# =========================
+# Model Configuration
+# =========================
+
+# Transformer / Encoder dimensions
+EMBED_DIM = 128
+
+NUM_HEADS = 4
+
+NUM_LAYERS = 3
+
+DROPOUT = 0.1
+
+
+
+# =========================
+# Saving Configuration
+# =========================
+
+MODEL_PATH = "best_market_model.pt"
+
+SCALER_PATH = "market_scaler.pkl"
