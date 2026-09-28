@@ -2,76 +2,67 @@
 
 import torch
 from torch.utils.data import Dataset
-import pandas as pd
-import numpy as np
+
 
 
 class MarketDataset(Dataset):
-    """
-    Dataset for XAUUSD market data.
 
-    Converts continuous market features into
-    fixed length sequences for Transformer / AutoEncoder.
+    """
+    Dataset for pre-created market windows.
 
     Input:
-        Sequence of candles
 
-        Shape:
-            (seq_length, num_features)
+        windows shape:
 
-    Example:
-        (60, 10)
+        (samples, sequence_length, features)
+
+
+        Example:
+
+        (70000,60,4)
+
 
     Output:
-        Same sequence for reconstruction
 
-        Shape:
-            (60, 10)
+        torch tensor:
+
+        (60,4)
+
     """
+
 
     def __init__(
         self,
-        data,
-        seq_length=60
+        windows
     ):
 
-        self.seq_length = seq_length
-
-
-        # Accept pandas DataFrame or numpy array
-
-        if isinstance(data, pd.DataFrame):
-            data = data.values
-
-
-        # Ensure correct datatype for PyTorch
-
-        self.data = data.astype(np.float32)
+        self.windows = windows
 
 
 
     def __len__(self):
 
-        return len(self.data) - self.seq_length
+        return len(
+            self.windows
+        )
 
 
 
-    def __getitem__(self, index):
+    def __getitem__(
+        self,
+        index
+    ):
 
-        # Create sliding window
 
-        sequence = self.data[
-            index :
-            index + self.seq_length
+        sample = self.windows[
+            index
         ]
 
 
-        # Convert numpy array to torch tensor
-
-        sequence = torch.tensor(
-            sequence,
+        sample = torch.tensor(
+            sample,
             dtype=torch.float32
         )
 
 
-        return sequence
+        return sample
