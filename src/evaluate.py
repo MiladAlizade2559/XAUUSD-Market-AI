@@ -14,7 +14,10 @@ PROJECT_ROOT = os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))
 )
 
-SRC_PATH = os.path.join(PROJECT_ROOT, "src")
+SRC_PATH = os.path.join(
+    PROJECT_ROOT,
+    "src"
+)
 
 if SRC_PATH not in sys.path:
     sys.path.append(SRC_PATH)
@@ -51,11 +54,15 @@ REPORT_DIR = os.path.join(
     "reports"
 )
 
+os.makedirs(
+    REPORT_DIR,
+    exist_ok=True
+)
+
 ERRORS_PATH = os.path.join(
     REPORT_DIR,
     "test_reconstruction_errors.csv"
 )
-
 
 # --------------------------------------------------
 # Settings
