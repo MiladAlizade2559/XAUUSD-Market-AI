@@ -290,6 +290,13 @@ model.eval()
 # --------------------------------------------------
 # Reconstruction errors
 # --------------------------------------------------
+# --------------------------------------------------
+# Reconstruction errors
+# --------------------------------------------------
+
+criterion = nn.SmoothL1Loss(
+    reduction="none"
+)
 
 reconstruction_errors = []
 
@@ -306,20 +313,12 @@ with torch.no_grad():
             batch
         )
 
-        # --------------------------------------------------
-        # Per-window reconstruction error
-        #
-        # Shape before mean:
-        # [batch, sequence, features]
-        #
-        # Shape after mean:
-        # [batch]
-        # --------------------------------------------------
+        error = criterion(
+            output,
+            batch
+        )
 
-        error = torch.mean(
-            torch.abs(
-                output - batch
-            ),
+        error = error.mean(
             dim=(1, 2)
         )
 
