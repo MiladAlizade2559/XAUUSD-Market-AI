@@ -44,7 +44,7 @@ DATA_PATH = os.path.join(
 
 MODEL_PATH = "/content/drive/MyDrive/XAUUSD_models/best_market_model.pt"
 
-SCALER_PATH = "/content/drive/MyDrive/XAUUSD_models/market_scaler.pkl"
+SCALER_PATH = "/content/drive/MyDrive/XAUUSD_models/market_scaler_fixed.pkl"
 
 REPORT_DIR = os.path.join(
     PROJECT_ROOT,
