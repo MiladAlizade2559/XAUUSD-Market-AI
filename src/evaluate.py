@@ -1,23 +1,78 @@
 import os
 import sys
+import pickle
 
 import numpy as np
 import pandas as pd
 import torch
+import torch.nn as nn
 from torch.utils.data import DataLoader
 
+
 # --------------------------------------------------
-# Project path
+# Device
 # --------------------------------------------------
 
-PROJECT_ROOT = os.path.dirname(
-    os.path.dirname(os.path.abspath(__file__))
+DEVICE = torch.device(
+    "cuda" if torch.cuda.is_available() else "cpu"
 )
 
-SRC_PATH = os.path.join(
-    PROJECT_ROOT,
-    "src"
+print(f"Device: {DEVICE}")
+
+
+# --------------------------------------------------
+# Project paths
+# --------------------------------------------------
+
+PROJECT_ROOT = "/content/XAUUSD-Market-AI"
+
+SRC_PATH = "/content/XAUUSD-Market-AI/src"
+
+DATA_PATH = (
+    "/content/XAUUSD-Market-AI/data/"
+    "XAUUSD_l_M1.csv"
 )
+
+MODEL_PATH = (
+    "/content/drive/MyDrive/XAUUSD_models/"
+    "best_market_model.pt"
+)
+
+SCALER_PATH = (
+    "/content/drive/MyDrive/XAUUSD_models/"
+    "market_scaler_fixed.pkl"
+)
+
+
+# --------------------------------------------------
+# Evaluation output paths
+# --------------------------------------------------
+
+EVAL_DIR = (
+    "/content/drive/MyDrive/XAUUSD_models/"
+    "evaluation"
+)
+
+ERRORS_PATH = (
+    "/content/drive/MyDrive/XAUUSD_models/"
+    "evaluation/"
+    "test_reconstruction_errors.csv"
+)
+
+
+# --------------------------------------------------
+# Create evaluation directory
+# --------------------------------------------------
+
+os.makedirs(
+    EVAL_DIR,
+    exist_ok=True
+)
+
+
+# --------------------------------------------------
+# Python path
+# --------------------------------------------------
 
 if SRC_PATH not in sys.path:
     sys.path.append(SRC_PATH)
@@ -30,108 +85,54 @@ if SRC_PATH not in sys.path:
 from features import create_features
 from window import create_windows
 from split import split_time_series
-from scaler import MarketScaler
 from dataset import MarketDataset
 from model import MarketAutoEncoder
 
 
 # --------------------------------------------------
-# Paths
-# --------------------------------------------------
-
-DATA_PATH = os.path.join(
-    PROJECT_ROOT,
-    "data",
-    "XAUUSD_l_M1.csv"
-)
-
-MODEL_PATH = "/content/drive/MyDrive/XAUUSD_models/best_market_model.pt"
-
-SCALER_PATH = "/content/drive/MyDrive/XAUUSD_models/market_scaler_fixed.pkl"
-
-REPORT_DIR = os.path.join(
-    PROJECT_ROOT,
-    "reports"
-)
-
-os.makedirs(
-    REPORT_DIR,
-    exist_ok=True
-)
-
-ERRORS_PATH = os.path.join(
-    REPORT_DIR,
-    "test_reconstruction_errors.csv"
-)
-
-# --------------------------------------------------
-# Settings
+# Configuration
 # --------------------------------------------------
 
 BATCH_SIZE = 256
 
 
 # --------------------------------------------------
-# Device
-# --------------------------------------------------
-
-device = torch.device(
-    "cuda" if torch.cuda.is_available() else "cpu"
-)
-
-print("Device:", device)
-
-
-# --------------------------------------------------
-# Check paths
-# --------------------------------------------------
-
-if not os.path.exists(DATA_PATH):
-    raise FileNotFoundError(
-        f"Dataset not found:\n{DATA_PATH}"
-    )
-
-if not os.path.exists(MODEL_PATH):
-    raise FileNotFoundError(
-        f"Model not found:\n{MODEL_PATH}"
-    )
-
-if not os.path.exists(SCALER_PATH):
-    raise FileNotFoundError(
-        f"Scaler not found:\n{SCALER_PATH}"
-    )
-
-os.makedirs(
-    REPORT_DIR,
-    exist_ok=True
-)
-
-
-# --------------------------------------------------
 # Load raw data
 # --------------------------------------------------
 
-df = pd.read_csv(DATA_PATH)
+df = pd.read_csv(
+    DATA_PATH
+)
 
-print("Raw data:", df.shape)
+print(
+    f"Raw data: {df.shape}"
+)
 
 
 # --------------------------------------------------
-# Feature engineering
+# Create features
 # --------------------------------------------------
 
-data = create_features(df)
+features = create_features(
+    df
+)
 
-print("Features:", data.shape)
+print(
+    f"Features: {features.shape}"
+)
 
 
 # --------------------------------------------------
 # Create windows
 # --------------------------------------------------
 
-windows = create_windows(data)
+windows = create_windows(
+    features
+)
 
-print("Windows:", windows.shape)
+print(
+    f"Windows: {windows.shape}"
+)
 
 
 # --------------------------------------------------
@@ -142,33 +143,65 @@ train_data, val_data, test_data = split_time_series(
     windows
 )
 
-print("Train:", train_data.shape)
-print("Validation:", val_data.shape)
-print("Test:", test_data.shape)
-
-
-# --------------------------------------------------
-# Load scaler
-# --------------------------------------------------
-
-scaler = MarketScaler()
-
-scaler.load(SCALER_PATH)
-
-test_scaled = scaler.transform(
-    test_data
+print(
+    f"Train: {train_data.shape}"
 )
 
-print("Test scaled:", test_scaled.shape)
+print(
+    f"Validation: {val_data.shape}"
+)
+
+print(
+    f"Test: {test_data.shape}"
+)
 
 
 # --------------------------------------------------
-# Test Dataset
+# Load trained scaler
+# --------------------------------------------------
+
+with open(
+    SCALER_PATH,
+    "rb"
+) as f:
+
+    scaler = pickle.load(
+        f
+    )
+
+
+# --------------------------------------------------
+# Scale test data
+# --------------------------------------------------
+
+test_reshaped = test_data.reshape(
+    -1,
+    test_data.shape[-1]
+)
+
+test_scaled = scaler.transform(
+    test_reshaped
+).reshape(
+    test_data.shape
+)
+
+print(
+    f"Test scaled: {test_scaled.shape}"
+)
+
+
+# --------------------------------------------------
+# Test dataset
 # --------------------------------------------------
 
 test_dataset = MarketDataset(
     test_scaled
 )
+
+
+# --------------------------------------------------
+# Test dataloader
+# --------------------------------------------------
 
 test_loader = DataLoader(
     test_dataset,
@@ -183,32 +216,39 @@ test_loader = DataLoader(
 
 model = MarketAutoEncoder()
 
-checkpoint = torch.load(
-    MODEL_PATH,
-    map_location=device
+model = model.to(
+    DEVICE
 )
 
-if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+
+# --------------------------------------------------
+# Load checkpoint
+# --------------------------------------------------
+
+checkpoint = torch.load(
+    MODEL_PATH,
+    map_location=DEVICE
+)
+
+
+if isinstance(
+    checkpoint,
+    dict
+) and "model_state_dict" in checkpoint:
 
     model.load_state_dict(
         checkpoint["model_state_dict"]
     )
 
-    print(
-        "Checkpoint loaded."
+    checkpoint_epoch = checkpoint.get(
+        "epoch",
+        None
     )
 
-    if "epoch" in checkpoint:
-        print(
-            "Checkpoint epoch:",
-            checkpoint["epoch"]
-        )
-
-    if "val_loss" in checkpoint:
-        print(
-            "Checkpoint val loss:",
-            checkpoint["val_loss"]
-        )
+    checkpoint_val_loss = checkpoint.get(
+        "val_loss",
+        None
+    )
 
 else:
 
@@ -216,56 +256,80 @@ else:
         checkpoint
     )
 
+    checkpoint_epoch = None
+    checkpoint_val_loss = None
+
+
+print(
+    "Checkpoint loaded."
+)
+
+
+if checkpoint_epoch is not None:
+
     print(
-        "Model state_dict loaded."
+        f"Checkpoint epoch: {checkpoint_epoch}"
     )
 
 
-model.to(device)
+if checkpoint_val_loss is not None:
+
+    print(
+        f"Checkpoint val loss: "
+        f"{checkpoint_val_loss}"
+    )
+
+
+# --------------------------------------------------
+# Evaluation mode
+# --------------------------------------------------
+
 model.eval()
 
 
 # --------------------------------------------------
-# Reconstruction error
+# Reconstruction errors
 # --------------------------------------------------
 
-errors = []
-
-criterion = torch.nn.SmoothL1Loss(
-    reduction="none"
-)
+reconstruction_errors = []
 
 
 with torch.no_grad():
 
     for batch in test_loader:
 
-        batch = batch.to(device)
+        batch = batch.to(
+            DEVICE
+        )
 
-        reconstruction = model(
+        output = model(
             batch
         )
 
-        loss = criterion(
-            reconstruction,
-            batch
-        )
+        # --------------------------------------------------
+        # Per-window reconstruction error
+        #
+        # Shape before mean:
+        # [batch, sequence, features]
+        #
+        # Shape after mean:
+        # [batch]
+        # --------------------------------------------------
 
-        # Mean error for each window
-        batch_errors = loss.mean(
+        error = torch.mean(
+            torch.abs(
+                output - batch
+            ),
             dim=(1, 2)
         )
 
-        errors.extend(
-            batch_errors.detach()
-            .cpu()
-            .numpy()
+        reconstruction_errors.extend(
+            error.cpu().numpy()
         )
 
 
-errors = np.asarray(
-    errors,
-    dtype=np.float64
+reconstruction_errors = np.asarray(
+    reconstruction_errors
 )
 
 
@@ -273,87 +337,104 @@ errors = np.asarray(
 # Statistics
 # --------------------------------------------------
 
-mean_error = errors.mean()
-
-median_error = np.median(
-    errors
+mean_error = np.mean(
+    reconstruction_errors
 )
 
-std_error = errors.std()
+median_error = np.median(
+    reconstruction_errors
+)
 
-min_error = errors.min()
+std_error = np.std(
+    reconstruction_errors
+)
 
-max_error = errors.max()
+min_error = np.min(
+    reconstruction_errors
+)
 
-percentile_95 = np.percentile(
-    errors,
+max_error = np.max(
+    reconstruction_errors
+)
+
+p95_error = np.percentile(
+    reconstruction_errors,
     95
 )
 
-percentile_99 = np.percentile(
-    errors,
+p99_error = np.percentile(
+    reconstruction_errors,
     99
 )
 
 
+# --------------------------------------------------
+# Print results
+# --------------------------------------------------
+
 print()
-print("===================================")
-print("Test Reconstruction Error")
-print("===================================")
-
 print(
-    "Mean:",
-    mean_error
+    "==================================="
 )
 
 print(
-    "Median:",
-    median_error
+    "Test Reconstruction Error"
 )
 
 print(
-    "Std:",
-    std_error
+    "==================================="
 )
 
 print(
-    "Min:",
-    min_error
+    f"Mean: {mean_error}"
 )
 
 print(
-    "Max:",
-    max_error
+    f"Median: {median_error}"
 )
 
 print(
-    "95th percentile:",
-    percentile_95
+    f"Std: {std_error}"
 )
 
 print(
-    "99th percentile:",
-    percentile_99
+    f"Min: {min_error}"
+)
+
+print(
+    f"Max: {max_error}"
+)
+
+print(
+    f"95th percentile: {p95_error}"
+)
+
+print(
+    f"99th percentile: {p99_error}"
 )
 
 
 # --------------------------------------------------
-# Save errors
+# Save reconstruction errors
 # --------------------------------------------------
 
-error_df = pd.DataFrame(
+errors_df = pd.DataFrame(
     {
-        "reconstruction_error": errors
+        "window_index": np.arange(
+            len(reconstruction_errors)
+        ),
+        "reconstruction_error": reconstruction_errors
     }
 )
 
-error_df.to_csv(
+
+errors_df.to_csv(
     ERRORS_PATH,
     index=False
 )
 
+
 print()
 print(
-    "Errors saved to:",
-    ERRORS_PATH
+    f"Errors saved to: {ERRORS_PATH}"
 )
