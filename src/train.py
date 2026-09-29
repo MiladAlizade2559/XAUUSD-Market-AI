@@ -1,21 +1,13 @@
 # train.py
 
 
+import os
+
 import torch
 import torch.nn as nn
 from torch.optim import Adam
 
-import joblib
 import pandas as pd
-
-
-from config import (
-    BATCH_SIZE,
-    EPOCHS,
-    LEARNING_RATE,
-    MODEL_PATH,
-    SCALER_PATH
-)
 
 
 from features import create_features
@@ -33,14 +25,50 @@ from dataloader import create_dataloader
 from model import MarketAutoEncoder
 
 
+# =====================================
+# Paths
+# =====================================
+
+PROJECT_ROOT = "/content/XAUUSD-Market-AI"
+
+DATA_PATH = (
+    "/content/XAUUSD-Market-AI/"
+    "data/XAUUSD_l_M1.csv"
+)
+
+MODEL_DIR = (
+    "/content/drive/MyDrive/"
+    "XAUUSD_models"
+)
+
+MODEL_PATH = (
+    "/content/drive/MyDrive/"
+    "XAUUSD_models/best_market_model.pt"
+)
+
+SCALER_PATH = (
+    "/content/drive/MyDrive/"
+    "XAUUSD_models/market_scaler_fixed.pkl"
+)
+
+
+# =====================================
+# Create output directory
+# =====================================
+
+os.makedirs(
+    MODEL_DIR,
+    exist_ok=True
+)
+
 
 # =====================================
 # Device
 # =====================================
 
-
 device = torch.device(
-    "cuda" if torch.cuda.is_available()
+    "cuda"
+    if torch.cuda.is_available()
     else "cpu"
 )
 
@@ -51,14 +79,12 @@ print(
 )
 
 
-
 # =====================================
 # Load Data
 # =====================================
 
-
 df = pd.read_csv(
-    "data/XAUUSD_l_M1.csv"
+    DATA_PATH
 )
 
 
@@ -68,11 +94,9 @@ print(
 )
 
 
-
 # =====================================
 # Feature Engineering
 # =====================================
-
 
 data = create_features(
     df
@@ -85,11 +109,9 @@ print(
 )
 
 
-
 # =====================================
 # Window Creation
 # =====================================
-
 
 windows = create_windows(
     data
@@ -102,11 +124,9 @@ print(
 )
 
 
-
 # =====================================
 # Split
 # =====================================
-
 
 train_data, val_data, test_data = split_time_series(
     windows
@@ -129,15 +149,17 @@ print(
 )
 
 
-
 # =====================================
 # Scaling
 # =====================================
 
-
 scaler = MarketScaler()
 
-scaler.fit(train_data)
+
+# Fit ONLY on training data
+scaler.fit(
+    train_data
+)
 
 
 train_scaled = scaler.transform(
@@ -155,20 +177,40 @@ test_scaled = scaler.transform(
 )
 
 
+print(
+    "Train scaled:",
+    train_scaled.shape
+)
 
-# save scaler
+print(
+    "Validation scaled:",
+    val_scaled.shape
+)
 
-joblib.dump(
-    scaler,
+print(
+    "Test scaled:",
+    test_scaled.shape
+)
+
+
+# =====================================
+# Save Scaler
+# =====================================
+
+scaler.save(
     SCALER_PATH
 )
 
+
+print(
+    "Scaler saved to:",
+    SCALER_PATH
+)
 
 
 # =====================================
 # Dataset
 # =====================================
-
 
 train_dataset = MarketDataset(
     train_scaled
@@ -180,17 +222,15 @@ val_dataset = MarketDataset(
 )
 
 
-
 # =====================================
 # DataLoader
 # =====================================
-
 
 train_loader = create_dataloader(
 
     train_dataset,
 
-    batch_size=BATCH_SIZE,
+    batch_size=64,
 
     shuffle=True
 
@@ -201,42 +241,50 @@ val_loader = create_dataloader(
 
     val_dataset,
 
-    batch_size=BATCH_SIZE,
+    batch_size=64,
 
     shuffle=False
 
 )
 
 
-
 # =====================================
 # Model
 # =====================================
 
-
 model = MarketAutoEncoder()
 
 
-model.to(device)
+model.to(
+    device
+)
 
 
+# =====================================
+# Loss
+# =====================================
 
 criterion = nn.SmoothL1Loss()
 
+
+# =====================================
+# Optimizer
+# =====================================
 
 optimizer = Adam(
 
     model.parameters(),
 
-    lr=LEARNING_RATE
+    lr=0.001
 
 )
-
 
 
 # =====================================
 # Training
 # =====================================
+
+EPOCHS = 30
 
 
 best_val_loss = float(
@@ -248,29 +296,29 @@ for epoch in range(EPOCHS):
 
 
     print(
-        f"\nEpoch {epoch+1}/{EPOCHS}"
+        f"\nEpoch {epoch + 1}/{EPOCHS}"
     )
 
 
-    # -----------------
+    # =================================
     # Train
-    # -----------------
+    # =================================
 
     model.train()
 
 
-    train_loss = 0
-
+    train_loss = 0.0
 
 
     for batch in train_loader:
 
 
-        batch = batch.to(device)
+        batch = batch.to(
+            device
+        )
 
 
         optimizer.zero_grad()
-
 
 
         reconstruction = model(
@@ -293,23 +341,22 @@ for epoch in range(EPOCHS):
         optimizer.step()
 
 
-
         train_loss += loss.item()
 
 
+    train_loss /= len(
+        train_loader
+    )
 
-    train_loss /= len(train_loader)
 
-
-
-    # -----------------
+    # =================================
     # Validation
-    # -----------------
+    # =================================
 
     model.eval()
 
 
-    val_loss = 0
+    val_loss = 0.0
 
 
     with torch.no_grad():
@@ -318,8 +365,9 @@ for epoch in range(EPOCHS):
         for batch in val_loader:
 
 
-            batch = batch.to(device)
-
+            batch = batch.to(
+                device
+            )
 
 
             reconstruction = model(
@@ -339,10 +387,14 @@ for epoch in range(EPOCHS):
             val_loss += loss.item()
 
 
+    val_loss /= len(
+        val_loader
+    )
 
-    val_loss /= len(val_loader)
 
-
+    # =================================
+    # Print Loss
+    # =================================
 
     print(
         "Train Loss:",
@@ -356,11 +408,9 @@ for epoch in range(EPOCHS):
     )
 
 
-
-    # -----------------
+    # =================================
     # Save Best Model
-    # -----------------
-
+    # =================================
 
     if val_loss < best_val_loss:
 
@@ -372,22 +422,19 @@ for epoch in range(EPOCHS):
 
             {
 
-            "epoch": epoch + 1,
+                "epoch":
+                    epoch + 1,
 
+                "model_state_dict":
+                    model.state_dict(),
 
-            "model_state_dict":
-                model.state_dict(),
+                "optimizer_state_dict":
+                    optimizer.state_dict(),
 
-
-            "optimizer_state_dict":
-                optimizer.state_dict(),
-
-
-            "val_loss":
-                val_loss
+                "val_loss":
+                    val_loss
 
             },
-
 
             MODEL_PATH
 
@@ -397,3 +444,40 @@ for epoch in range(EPOCHS):
         print(
             "✅ Best model saved"
         )
+
+        print(
+            "Model path:",
+            MODEL_PATH
+        )
+
+
+# =====================================
+# Training Complete
+# =====================================
+
+print(
+    "\n==================================="
+)
+
+print(
+    "Training Complete"
+)
+
+print(
+    "==================================="
+)
+
+print(
+    "Best validation loss:",
+    best_val_loss
+)
+
+print(
+    "Best model:",
+    MODEL_PATH
+)
+
+print(
+    "Scaler:",
+    SCALER_PATH
+)
